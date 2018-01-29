@@ -1,0 +1,3 @@
+-main boto3.IntegrationTests
+-python test.py
+-cmd python3 test.py
