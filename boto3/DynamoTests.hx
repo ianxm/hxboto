@@ -15,14 +15,8 @@ import python.lib.datetime.Datetime;
 
    if the test table already exists the tests will not run.
  **/
-class IntegrationTests {
+class DynamoTests {
     static var TABLE_NAME = "Books";
-
-    /** session object */
-    private var session :Session;
-
-    /** dynamo client made from session */
-    private var sessionDynamo :DynamoDBClient;
 
     /** dynamo client made using default session */
     private var dynamo :DynamoDBClient;
@@ -30,22 +24,15 @@ class IntegrationTests {
     /** this gets set when we create a backup */
     private var backupArn :String;
 
+    /** aws account id, looked up in the sts test */
+    private var accountId :String;
+
     /**
-       init session and client objects
+       init client object
      **/
-    public function new() {
-        session = Boto3.session({regionName: "us-east-1",
-                                 profileName: "default"});
-        sessionDynamo = session.client("dynamodb");
+    public function new(accountId :String) {
         dynamo = Boto3.client("dynamodb");
-    }
-
-    /**
-
-     **/
-    static public function main() {
-        var runner = new IntegrationTests();
-        runner.run();
+        this.accountId = accountId;
     }
 
     /**
@@ -56,7 +43,6 @@ class IntegrationTests {
      **/
     public function run() {
         // general
-        sessionTests();
         describeLimits();
         generatePresignedUrl();
 
@@ -131,100 +117,89 @@ class IntegrationTests {
         waitForTableDelete();
     }
 
-
-    private function sessionTests() {
-        trace("session tests:");
-        trace("  profiles: " + session.availableProfiles);
-        trace("  partitions: " + session.getAvailablePartitions());
-        trace("  regions: " + session.getAvailableRegions("dynamodb", "aws", false));
-        trace("  services: " + session.getAvailableServices());
-        trace("  profileName: " + session.profileName);
-        trace("  regionName: " + session.regionName);
-    }
-
     private function describeLimits() {
-        var result = sessionDynamo.describeLimits();
-        trace("checking limits");
-        trace("  account read limit: " + result.get("AccountMaxReadCapacityUnits"));
-        trace("  account write limit: " + result.get("AccountMaxWriteCapacityUnits"));
+        var result = dynamo.describeLimits();
+        trace("  checking limits");
+        trace("    account read limit: " + result.get("AccountMaxReadCapacityUnits"));
+        trace("    account write limit: " + result.get("AccountMaxWriteCapacityUnits"));
     }
 
     private function generatePresignedUrl() {
-        var request = {"ClientMethod": "describe_table",
-                       "Params": Lib.anonToDict({"TableName": TABLE_NAME}),
-                       "ExpiresIn": 60,
-                       "HttpMethod": "GET"};
-        var result = sessionDynamo.generatePresignedUrl(request);
-        trace("example presigned url: " + result);
+        var request = {ClientMethod: "describe_table",
+                       Params: Lib.anonToDict({"TableName": TABLE_NAME}),
+                       ExpiresIn: 60,
+                       HttpMethod: "GET"};
+        var result = dynamo.generatePresignedUrl(request);
+        trace("  example presigned url: " + result);
     }
 
     private function quitIfTestTableExists() {
-        var request = {"TableName": TABLE_NAME};
+        var request = {TableName: TABLE_NAME};
         try {
             var result = dynamo.describeTable(request);
             throw "test table \"" + TABLE_NAME + "\" exists. exiting.";
         } catch (e: ClientError) {
-            trace("no test table, good: " + Type.getClassName(Type.getClass(e)));
+            trace("  no test table, good: " + Type.getClassName(Type.getClass(e)));
         }
     }
 
     private function createTable() {
-        var request = {"AttributeDefinitions": [Lib.anonToDict({AttributeName: "title", AttributeType: "S"}),
+        var request = {AttributeDefinitions: [Lib.anonToDict({AttributeName: "title", AttributeType: "S"}),
                                                 Lib.anonToDict({AttributeName: "author", AttributeType: "S"}),
                                                 Lib.anonToDict({AttributeName: "year", AttributeType: "N"})],
-                       "TableName": TABLE_NAME,
-                       "KeySchema": [Lib.anonToDict({AttributeName: "title", KeyType: "HASH"}),
+                       TableName: TABLE_NAME,
+                       KeySchema: [Lib.anonToDict({AttributeName: "title", KeyType: "HASH"}),
                                      Lib.anonToDict({AttributeName: "author", KeyType: "RANGE"})],
-                       "ProvisionedThroughput": Lib.anonToDict({ReadCapacityUnits: 2, WriteCapacityUnits: 2}),
-                       "GlobalSecondaryIndexes": [Lib.anonToDict({IndexName: "author-year-index",
+                       ProvisionedThroughput: Lib.anonToDict({ReadCapacityUnits: 2, WriteCapacityUnits: 2}),
+                       GlobalSecondaryIndexes: [Lib.anonToDict({IndexName: "author-year-index",
                                                                   KeySchema: [Lib.anonToDict({AttributeName: "author", KeyType: "HASH"}),
                                                                               Lib.anonToDict({AttributeName: "year", KeyType: "RANGE"})],
                                                                   Projection: Lib.anonToDict({ProjectionType: "ALL"}),
                                                                   ProvisionedThroughput: Lib.anonToDict({ReadCapacityUnits: 2, WriteCapacityUnits: 2})})]};
         var result = dynamo.createTable(request);
-        trace('creating table ($TABLE_NAME): ' + result.get("TableDescription").get("TableStatus"));
+        trace('  creating table ($TABLE_NAME): ' + result.get("TableDescription").get("TableStatus"));
     }
 
     private function waitForTableCreate() {
-        trace("  waiting for table creation...");
+        trace("    waiting for table creation...");
         var waiter = dynamo.getWaiter("table_exists");
         var request = {TableName: TABLE_NAME,
                        WaiterConfig: Lib.anonToDict({Delay: 40, MaxAttempts: 50})};
         waiter.wait(request);
-        trace("  done waiting. table exists");
+        trace("    done waiting. table exists");
     }
 
     private function listTables() {
         var request = {Limit: 3};
         var result = dynamo.listTables(request);
-        trace("found tables: " + result.get("TableNames"));
+        trace("  found tables: " + result.get("TableNames"));
     }
 
     private function describeTable() {
-        var request = {"TableName": TABLE_NAME};
+        var request = {TableName: TABLE_NAME};
         var result = dynamo.describeTable(request);
-        trace('table description ($TABLE_NAME):');
-        trace("  status: " + result.get("Table").get("TableStatus"));
-        trace("  arn: " + result.get("Table").get("TableArn"));
-        trace("  num items: " + result.get("Table").get("ItemCount"));
+        trace('  table description ($TABLE_NAME):');
+        trace("    status: " + result.get("Table").get("TableStatus"));
+        trace("    arn: " + result.get("Table").get("TableArn"));
+        trace("    num items: " + result.get("Table").get("ItemCount"));
     }
 
     private function putItem() {
         var dateStr = Std.string(Math.floor(Datetime.utcnow().timestamp()));
-        var request = {"TableName": TABLE_NAME,
-                       "Item": Lib.anonToDict({title: Lib.anonToDict({S: "The Martian"}),
+        var request = {TableName: TABLE_NAME,
+                       Item: Lib.anonToDict({title: Lib.anonToDict({S: "The Martian"}),
                                                author: Lib.anonToDict({S: "Andy Weir"}),
                                                year: Lib.anonToDict({N: "2013"}),
                                                categories: Lib.anonToDict({SS: ["Science Fiction"]}),
                                                date: Lib.anonToDict({N: dateStr})})};
         var result = dynamo.putItem(request);
-        trace("put, status code: " + result.get("ResponseMetadata").get("HTTPStatusCode"));
+        trace("  put, status code: " + result.get("ResponseMetadata").get("HTTPStatusCode"));
     }
 
     private function batchWriteItem() {
         var dateStr = Std.string(Math.floor(Datetime.utcnow().timestamp()));
-        var request = {"RequestItems": Lib.anonToDict({
-                "Books":[
+        var request = {RequestItems: Lib.anonToDict({
+                Books:[
                          Lib.anonToDict({PutRequest: Lib.anonToDict({Item: Lib.anonToDict({title: Lib.anonToDict({S: "The Magician's Nephew"}),
                                                                                            author: Lib.anonToDict({S: "C. S. Lewis"}),
                                                                                            year: Lib.anonToDict({N: "1955"}),
@@ -266,12 +241,12 @@ class IntegrationTests {
                                                                                            categories: Lib.anonToDict({SS: ["Novel"]}),
                                                                                            ttl: Lib.anonToDict({N: dateStr})})})})]})};
         var result = dynamo.batchWriteItem(request);
-        trace("batch write, status code: " + result.get("ResponseMetadata").get("HTTPStatusCode"));
+        trace("  batch write, status code: " + result.get("ResponseMetadata").get("HTTPStatusCode"));
     }
 
     // private function canPaginate() {
     //     var result = dynamo.canPaginate("scan");
-    //     trace("canPaginate(scan): " + result);
+    //     trace("  canPaginate(scan): " + result);
     // }
 
     private function scan() {
@@ -284,9 +259,9 @@ class IntegrationTests {
                                                                    "#c": "categories"}),
                        ExpressionAttributeValues: Lib.anonToDict({":y": Lib.anonAsDict({N: "1950"})})};
         var result = dynamo.scan(request);
-        trace("scan:");
+        trace("  scan:");
         for( item in cast(result.get("Items"),Array<Dynamic>) ) {
-            trace("  " + item.get("title").get("S")
+            trace("    " + item.get("title").get("S")
                   + ", " + item.get("year").get("N")
                   + ", " + cast(item.get("categories").get("SS"),Array<Dynamic>).join("/"));
         }
@@ -300,7 +275,7 @@ class IntegrationTests {
                        ExpressionAttributeNames: Lib.anonToDict({"#c": "categories"}),
                        ExpressionAttributeValues: Lib.anonToDict({":c": Lib.anonToDict({SS: ["Fiction"]})})};
         var result = dynamo.updateItem(request);
-        trace("update: " + result.get("HTTPStatusCode"));
+        trace("  update: " + result.get("HTTPStatusCode"));
     }
 
     private function getItem() {
@@ -308,7 +283,7 @@ class IntegrationTests {
                        Key: Lib.anonToDict({title: Lib.anonToDict({S: "A Man Called Ove"}),
                                             author: Lib.anonToDict({S: "Fredrik Backman"})})};
         var result = dynamo.getItem(request);
-        trace("get: " + result.get("Item"));
+        trace("  get: " + result.get("Item"));
     }
 
     private function batchGetItem() {
@@ -318,9 +293,9 @@ class IntegrationTests {
                                                                                      Lib.anonToDict({title: Lib.anonToDict({S: "On Intelligence"}),
                                                                                                      author: Lib.anonToDict({S: "Jeff Hawkins"})})]})})};
         var result = dynamo.batchGetItem(request);
-        trace("batch get:");
+        trace("  batch get:");
         for( item in cast(result.get("Responses").get(TABLE_NAME),Array<Dynamic>) ) {
-            trace("  " + item.get("title").get("S")
+            trace("    " + item.get("title").get("S")
                   + ", " + item.get("year").get("N")
                   + ", " + cast(item.get("categories").get("SS"),Array<Dynamic>).join("/"));
         }
@@ -333,58 +308,58 @@ class IntegrationTests {
                        ExpressionAttributeNames: Lib.anonToDict({"#a": "author"}),
                        ExpressionAttributeValues: Lib.anonToDict({":a": Lib.anonAsDict({S: "Neal Stephenson"})})};
         var result = dynamo.query(request);
-        trace("query:");
+        trace("  query:");
         for( item in cast(result.get("Items"),Array<Dynamic>) ) {
-            trace("  " + item.get("title").get("S")
+            trace("    " + item.get("title").get("S")
                   + ", " + item.get("year").get("N")
                   + ", " + cast(item.get("categories").get("SS"),Array<Dynamic>).join("/"));
         }
     }
 
     private function updateTable() {
-        var request = {"TableName": TABLE_NAME,
-                       "ProvisionedThroughput": Lib.anonToDict({"ReadCapacityUnits": 2, "WriteCapacityUnits": 1})};
+        var request = {TableName: TABLE_NAME,
+                       ProvisionedThroughput: Lib.anonToDict({"ReadCapacityUnits": 2, "WriteCapacityUnits": 1})};
         var result = dynamo.updateTable(request);
-        trace("updateTable: " + result.get("HTTPStatusCode"));
+        trace("  updateTable: " + result.get("HTTPStatusCode"));
     }
 
     private function tagResource() {
-        var request = {"ResourceArn": "arn:aws:dynamodb:us-east-1:356409446153:table/" + TABLE_NAME,
-                       "Tags": [Lib.anonAsDict({"Key": "tag1", "Value": "testtag"})]};
+        var request = {ResourceArn: "arn:aws:dynamodb:us-east-1:$accountId:table/" + TABLE_NAME,
+                       Tags: [Lib.anonAsDict({"Key": "tag1", "Value": "testtag"})]};
         dynamo.tagResource(request);
-        trace("tagged");
+        trace("  tagged");
     }
 
     private function listTagsOfResource() {
-        var request = {"ResourceArn": "arn:aws:dynamodb:us-east-1:356409446153:table/" + TABLE_NAME};
+        var request = {ResourceArn: "arn:aws:dynamodb:us-east-1:$accountId:table/" + TABLE_NAME};
         var result = dynamo.listTagsOfResource(request);
-        trace("listTagsOfResource: " + result.get("Tags"));
+        trace("  listTagsOfResource: " + result.get("Tags"));
     }
 
     private function untagResource() {
-        var request = {"ResourceArn": "arn:aws:dynamodb:us-east-1:356409446153:table/" + TABLE_NAME,
-                       "TagKeys": ["tag1"]};
+        var request = {ResourceArn: "arn:aws:dynamodb:us-east-1:$accountId:table/" + TABLE_NAME,
+                       TagKeys: ["tag1"]};
         dynamo.untagResource(request);
-        trace("untagged");
+        trace("  untagged");
     }
 
     private function createBackup() {
-        var request = {"TableName": TABLE_NAME, "BackupName": TABLE_NAME+"-backup"};
+        var request = {TableName: TABLE_NAME, "BackupName": TABLE_NAME+"-backup"};
         var result = dynamo.createBackup(request);
         backupArn = result.get("BackupDetails").get("BackupArn");
-        trace("createBackup: " + result);
+        trace("  createBackup: " + result);
     }
 
     private function describeBackup() {
-        var request = {"BackupArn": backupArn};
+        var request = {BackupArn: backupArn};
         var result = dynamo.describeBackup(request);
-        trace("describeBackup: " + result);
+        trace("  describeBackup: " + result);
     }
 
     private function describeContinuousBackups() {
-        var request = {"TableName": TABLE_NAME};
+        var request = {TableName: TABLE_NAME};
         var result = dynamo.describeContinuousBackups(request);
-        trace("describeContinuousBackups: " + result);
+        trace("  describeContinuousBackups: " + result);
     }
 
     private function deleteItem() {
@@ -392,7 +367,7 @@ class IntegrationTests {
                        Key: Lib.anonToDict({title: Lib.anonToDict({S: "Seveneves"}),
                                             author: Lib.anonToDict({S: "Neal Stephenson"})})};
         var result = dynamo.deleteItem(request);
-        trace("delete item: " + result);
+        trace("  delete item: " + result);
     }
 
     private function listBackups() {
@@ -400,41 +375,41 @@ class IntegrationTests {
         var result = dynamo.listBackups({"TableName": TABLE_NAME,
                                          "Limit": 2,
                                          "TimeRangeUpperBound": date});
-        trace("listBackups: " + result);
+        trace("  listBackups: " + result);
     }
 
     private function restoreTableFromBackup() {
         var result = dynamo.restoreTableFromBackup({"TargetTableName": TABLE_NAME,
                                                     "BackupArn": backupArn});
-        trace("restoreTableFromBackup: " + result);
+        trace("  restoreTableFromBackup: " + result);
     }
 
     private function deleteBackup() {
         var result = dynamo.deleteBackup({"BackupArn": backupArn});
-        trace("deleteBackup: " + result);
+        trace("  deleteBackup: " + result);
     }
 
     private function describeTimeToLive() {
         var result = dynamo.describeTimeToLive({"TableName": TABLE_NAME});
-        trace("describeTimeToLive: " + result);
+        trace("  describeTimeToLive: " + result);
     }
 
     private function updateTTL() {
         var result = dynamo.updateTimeToLive({"TableName": TABLE_NAME,
                                               "TimeToLiveSpecification": Lib.anonToDict({"Enabled": true,
                                                                                          "AttributeName": "ttl"})});
-        trace("updateTTL: " + result);
+        trace("  updateTTL: " + result);
     }
 
     private function deleteTable() {
         var result = dynamo.deleteTable({"TableName": TABLE_NAME});
-        trace("deleteTable: " + result.get("TableDescription").get("TableStatus"));
+        trace("  deleteTable: " + result.get("TableDescription").get("TableStatus"));
     }
 
     private function waitForTableDelete() {
-        trace("  waiting for table deletion...");
+        trace("    waiting for table deletion...");
         var waiter = dynamo.getWaiter("table_not_exists");
-        waiter.wait({"TableName": TABLE_NAME});
-        trace("  done waiting. table deleted");
+        waiter.wait({TableName: TABLE_NAME});
+        trace("    done waiting. table deleted");
     }
 }

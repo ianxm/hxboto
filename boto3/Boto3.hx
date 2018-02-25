@@ -1,6 +1,7 @@
 package boto3;
 
 import haxe.extern.EitherType;
+import haxe.io.BytesData;
 import python.KwArgs;
 import python.Dict;
 import python.lib.datetime.Datetime;
@@ -12,7 +13,7 @@ import python.lib.datetime.Datetime;
 @:pythonImport("boto3")
 @:native("boto3")
 extern class Boto3 {
-    static function client(service_name :String, ?options :KwArgs<Boto3ClientOptions>) :DynamoDBClient;
+    static function client(service_name :String, ?options :KwArgs<Boto3ClientOptions>) :Dynamic;
 
     // @:native("get_paginator")
     // static function getPaginator(name :String) :EitherType<ListTablesPaginator,EitherType<QueryPaginator,ScanPaginator>>;
@@ -513,4 +514,207 @@ typedef UpdateTableDeleteGSI = {
 typedef UpdateTimeToLiveOptions = {
     var TableName :String;
     var TimeToLiveSpecification :Dict<String,EitherType<Bool,String>>;
+}
+
+/**
+   this is the main lambda low level client interface.
+**/
+@:native("Lambda.Client")
+extern class LambdaClient {
+    @:native("add_permission")
+    function addPermission(options :KwArgs<AddPermissionOptions>) :Dict<String,String>;
+
+    @:native("can_paginate")
+    function canPaginate(operationName :String) :Void;
+
+    @:native("create_alias")
+    function createAlias(options :KwArgs<CreateAliasOptions>) :Dict<String,Dynamic>;
+
+    @:native("create_function")
+    function createFunction(options :KwArgs<CreateFunctionOptions>) :Dict<String,Dynamic>;
+
+    @:native("delete_alias")
+    function deleteAlias(options :KwArgs<DeleteAliasOptions>) :Void;
+
+    @:native("delete_function")
+    function deleteFunction(options :KwArgs<DeleteFunctionOptions>) :Void;
+
+    @:native("generate_presigned_url")
+    function generatePresignedUrl(options :KwArgs<GeneratePresignedUrlOptions>) :String;
+
+    @:native("get_account_settings")
+    function getAccountSettings() :Dict<String,Dynamic>;
+
+    @:native("get_alias")
+    function getAlias(options :KwArgs<GetAliasOptions>) :Dict<String,Dynamic>;
+
+    @:native("get_function")
+    function getFunction(options :KwArgs<GetFunctionOptions>) :Dict<String,Dynamic>;
+
+    @:native("get_function_configuration")
+    function getFunctionConfiguration(options :KwArgs<GetFunctionOptions>) :Dict<String,Dynamic>;
+
+    @:native("get_waiter")
+    function getWaiter(waiterName :String) :Waiter;
+
+    @:native("get_policy")
+    function getPolicy(options :KwArgs<GetPolicyOptions>) :Dict<String,Dynamic>;
+
+    @:native("invoke")
+    function invoke(options :KwArgs<InvokeOptions>) :Dict<String,Dynamic>;
+
+    @:native("list_aliases")
+    function listAliases(options :KwArgs<ListAliasesOptions>) :Dict<String,Dynamic>;
+
+    @:native("list_functions")
+    function listFunctions(options :KwArgs<ListFunctionsOptions>) :Dict<String,Dynamic>;
+
+    @:native("list_versions_by_function")
+    function listVersionsByFunction(options :KwArgs<ListVersionsByFunctionOptions>) :Dict<String,Dynamic>;
+
+    @:native("list_tags")
+    function listTags(options :KwArgs<ListTagsOptions>) :Dict<String,Dynamic>;
+
+    @:native("remove_permission")
+    function removePermission(options :KwArgs<RemovePermissionOptions>) :Void;
+
+    @:native("tag_resource")
+    function tagResource(options :KwArgs<TagResourceLambdaOptions>) :Void;
+
+    @:native("untag_resource")
+    function untagResource(options :KwArgs<UntagResourceLambdaOptions>) :Void;
+
+    @:native("update_alias")
+    function updateAlias(options :KwArgs<UpdateAliasOptions>) :Dict<String,Dynamic>;
+}
+
+typedef AddPermissionOptions = {
+    var FunctionName :String;
+    var StatementId :String;
+    var Action :String;
+    var Principal :String;
+    @:optional var SourceArn :String;
+    @:optional var SourceAccount :String;
+    @:optional var EventSourceToken :String;
+    @:optional var Qualifier :String;
+    @:optional var RevisionId :String;
+}
+
+typedef CreateAliasOptions = {
+    var FunctionName :String;
+    var Name :String;
+    var FunctionVersion :String;
+    @:optional var Description :String;
+    @:optional var RoutingConfig :Dict<String,Dynamic>;
+}
+
+typedef CreateFunctionOptions = {
+    var FunctionName :String;
+    var Runtime :String;
+    var Role :String;
+    var Handler :String;
+    var Code :Dict<String,Dynamic>;
+    @:optional var Description :String;
+    @:optional var Timeout :Int;
+    @:optional var MemorySize :Int;
+    @:optional var Publish :Bool;
+    @:optional var VpcConfig :Dict<String,Dynamic>;
+    @:optional var DeadLetterConfig :Dict<String,String>;
+    @:optional var Environment :Dict<String,Dict<String,String>>;
+    @:optional var KMSKeyArn :String;
+    @:optional var TracingConfig :Dict<String,String>;
+    @:optional var Tags :Dict<String,String>;
+}
+
+typedef DeleteAliasOptions = {
+    var FunctionName :String;
+    var Name :String;
+}
+
+typedef DeleteFunctionOptions = {
+    var FunctionName :String;
+    @:optional var Qualifier :String;
+}
+
+typedef GetAliasOptions = {
+    var FunctionName :String;
+    var Name :String;
+}
+
+typedef GetFunctionOptions = {
+    var FunctionName :String;
+    @:optional var Qualifier :String;
+}
+
+typedef GetPolicyOptions = {
+    var FunctionName :String;
+    @:optional var Qualifier :String;
+}
+
+typedef InvokeOptions = {
+    var FunctionName :String;
+    @:optional var InvocationType :String;
+    @:optional var LogType :String;
+    @:optional var ClientContext :String;
+    @:optional var Payload :BytesData;
+    @:optional var Qualifier :String;
+}
+
+typedef ListAliasesOptions = {
+    var FunctionName :String;
+    @:optional var FunctionVersion :String;
+    @:optional var Marker :String;
+    @:optional var MaxItems :Int;
+}
+
+typedef ListFunctionsOptions = {
+    @:optional var MasterRegion :String;
+    @:optional var FunctionVersion :String;
+    @:optional var Marker :String;
+    @:optional var MaxItems :Int;
+}
+
+typedef ListVersionsByFunctionOptions = {
+    var FunctionName :String;
+    @:optional var Marker :String;
+    @:optional var MaxItems :Int;
+}
+
+typedef ListTagsOptions = {
+    var Resource :String;
+}
+
+typedef RemovePermissionOptions = {
+    var FunctionName :String;
+    var StatementId :String;
+    @:optional var Qualifier :String;
+    @:optional var RevisionId :String;
+}
+
+typedef TagResourceLambdaOptions = {
+    var Resource :String;
+    var Tags :Dict<String,String>;
+}
+
+typedef UntagResourceLambdaOptions = {
+    var Resource :String;
+    var TagKeys :Array<String>;
+}
+
+typedef UpdateAliasOptions = {
+    var FunctionName :String;
+    var Name :String;
+    @:optional var FunctionVersion :String;
+    @:optional var Description :String;
+    @:optional var RoutingConfig :Dict<String,Dynamic>;
+    @:optional var RevisionId :String;
+}
+
+/**
+   this is the main sts low level client interface.
+**/
+@:native("STS.Client")
+extern class STSClient {
+    @:native("get_caller_identity")
+    function getCallerIdentity() :Dict<String,String>;
 }
