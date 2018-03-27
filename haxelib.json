@@ -4,8 +4,8 @@
   "tags": ["python"],
   "description": "externs for native python aws sdk",
   "contributors": ["ianxm"],
-  "releasenote": "initial release, dynamo only",
-  "version": "0.0.1",
+  "releasenote": "cleaned up pythonImports",
+  "version": "0.0.3",
   "url": "https://github.com/ianxm/hxboto",
   "dependencies": {
   }

@@ -11,7 +11,6 @@ import python.lib.datetime.Datetime;
    start by either getting a client here or getting a session and then a client.
 **/
 @:pythonImport("boto3")
-@:native("boto3")
 extern class Boto3 {
     static function client(service_name :String, ?options :KwArgs<Boto3ClientOptions>) :Dynamic;
 
@@ -28,7 +27,7 @@ extern class Boto3 {
 /**
    this is for creating clients using custom sessions
 **/
-@:native("boto3.session.Session")
+@:pythonImport("boto3.session", "Session")
 extern class Session {
     @:native("available_profiles")
     var availableProfiles :List<String>;
@@ -150,7 +149,7 @@ typedef WaitOptions = {
 /**
    this is the main dynamo low level client interface.
 **/
-@:native("DynamoDB.Client")
+@:pythonImport("botocore.client", "BaseClient")
 extern class DynamoDBClient {
     @:native("batch_get_item")
     function batchGetItem(options :KwArgs<BatchGetItemOptions>) :Dict<String,Dynamic>;
@@ -519,7 +518,7 @@ typedef UpdateTimeToLiveOptions = {
 /**
    this is the main lambda low level client interface.
 **/
-@:native("Lambda.Client")
+@:pythonImport("botocore.client", "BaseClient")
 extern class LambdaClient {
     @:native("add_permission")
     function addPermission(options :KwArgs<AddPermissionOptions>) :Dict<String,String>;
@@ -713,7 +712,7 @@ typedef UpdateAliasOptions = {
 /**
    this is the main sts low level client interface.
 **/
-@:native("STS.Client")
+@:pythonImport("boto3", "STS.Client")
 extern class STSClient {
     @:native("get_caller_identity")
     function getCallerIdentity() :Dict<String,String>;
